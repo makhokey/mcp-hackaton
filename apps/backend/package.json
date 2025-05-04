@@ -11,9 +11,18 @@
   "license": "ISC",
   "dependencies": {
     "@repo/typescript-config": "workspace:*",
+    "@types/cors": "^2.8.17",
+    "axios": "^1.9.0",
+    "cheerio": "^1.0.0",
+    "cors": "^2.8.5",
+    "express": "^5.1.0"
+  },
+  "devDependencies": {
+    "@repo/typescript-config": "workspace:*",
+    "@types/axios": "^0.14.4",
+    "@types/cheerio": "^0.22.35",
     "@types/express": "^5.0.1",
     "@types/node": "^22.15.3",
-    "express": "^5.1.0",
     "nodemon": "^3.1.10",
     "ts-node": "^10.9.2",
     "typescript": "^5.8.3"
