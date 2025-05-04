@@ -1,5 +1,4 @@
 import axios from "axios";
-import * as cheerio from 'cheerio';
 import { load } from 'cheerio';
 import { URLSearchParams } from 'url'; // Needed for form data encoding
 
