@@ -10,10 +10,41 @@ interface MarkdownRendererProps {
 }
 
 export function MarkdownRenderer({ children }: MarkdownRendererProps) {
+  // Process links in markdown content to open in new tab
+  const transformLinksToOpenInNewTab = (content: string) => {
+    // This is a simple transformation to ensure markdown links are rendered with target="_blank"
+    // but the actual target attribute is applied in the rehypePlugins setup
+    return content;
+  };
+
+  // Create a custom plugin to add target="_blank" to all links
+  const rehypeExternalLinks = () => {
+    return (tree: any) => {
+      if (tree.children) {
+        const visit = (nodes: any[]) => {
+          for (const node of nodes) {
+            if (node.tagName === 'a' && node.properties) {
+              node.properties.target = '_blank';
+              node.properties.rel = 'noopener noreferrer';
+            }
+            if (node.children) {
+              visit(node.children);
+            }
+          }
+        };
+        visit(tree.children);
+      }
+      return tree;
+    };
+  };
+
   return (
     <div className="space-y-3">
-      <Markdown remarkPlugins={[remarkGfm]} components={COMPONENTS}>
-        {children}
+      <Markdown
+        remarkPlugins={[remarkGfm]}
+        components={COMPONENTS}
+        rehypePlugins={[rehypeExternalLinks]}>
+        {transformLinksToOpenInNewTab(children)}
       </Markdown>
     </div>
   )
@@ -137,6 +168,14 @@ function childrenTakeAllStringContents(element: any): string {
   return ""
 }
 
+function withClass(Tag: keyof JSX.IntrinsicElements, classes: string) {
+  const Component = ({ node, ...props }: any) => (
+    <Tag className={classes} {...props} />
+  )
+  Component.displayName = Tag
+  return Component
+}
+
 const COMPONENTS = {
   h1: withClass("h1", "text-2xl font-semibold"),
   h2: withClass("h2", "font-semibold text-xl"),
@@ -144,7 +183,14 @@ const COMPONENTS = {
   h4: withClass("h4", "font-semibold text-base"),
   h5: withClass("h5", "font-medium"),
   strong: withClass("strong", "font-semibold"),
-  a: withClass("a", "text-primary underline underline-offset-2"),
+  a: ({ node, ...props }: any) => (
+    <a
+      className="text-foreground-muted underline underline-offset-2"
+      target="_blank"
+      rel="noopener noreferrer"
+      {...props}
+    />
+  ),
   blockquote: withClass("blockquote", "border-l-2 border-primary pl-4"),
   code: ({ children, className, node, ...rest }: any) => {
     const match = /language-(\w+)/.exec(className || "")
@@ -182,14 +228,6 @@ const COMPONENTS = {
   tr: withClass("tr", "m-0 border-t p-0 even:bg-muted"),
   p: withClass("p", "whitespace-pre-wrap"),
   hr: withClass("hr", "border-foreground/20"),
-}
-
-function withClass(Tag: keyof JSX.IntrinsicElements, classes: string) {
-  const Component = ({ node, ...props }: any) => (
-    <Tag className={classes} {...props} />
-  )
-  Component.displayName = Tag
-  return Component
 }
 
 export default MarkdownRenderer

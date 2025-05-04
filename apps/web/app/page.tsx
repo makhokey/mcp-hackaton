@@ -41,10 +41,16 @@ export default function Home() {
     // Use async IIFE to handle the async API call
     (async () => {
       try {
-        const response = await axios.post('http://localhost:3010/llm/chat', {
+        const payload: { prompt: string; sessionId?: string } = {
           prompt: input.trim(),
-          sessionId
-        });
+        };
+
+        // Only include sessionId if it exists
+        if (sessionId) {
+          payload.sessionId = sessionId;
+        }
+
+        const response = await axios.post('http://localhost:3010/llm/chat', payload);
 
         const aiMessage: Message = {
           id: (Date.now() + 1).toString(),

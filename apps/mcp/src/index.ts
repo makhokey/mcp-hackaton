@@ -22,6 +22,13 @@ const CompanyIdSchema = z.object({
     companyID: z.string().min(1).describe("The company ID (Tax ID / Identification Code)"),
 });
 
+const SearchCompanyCriteriaSchema = z.object({
+    name: z.string().optional().describe("The company name to search for"),
+    email: z.string().optional().describe("The company email to search for"),
+    legalForm: z.string().optional().describe("The company legal form code (optional)"),
+    query: z.string().describe("A dummy query field to satisfy OpenAI's schema requirements")
+});
+
 // --- JSON Schema for MCP Tool Definition ---
 const CompanyIdJsonSchema = {
     type: "object",
@@ -29,6 +36,17 @@ const CompanyIdJsonSchema = {
         companyID: { type: "string", description: "The company ID (Tax ID / Identification Code)" }
     },
     required: ["companyID"]
+};
+
+const SearchCompanyCriteriaJsonSchema = {
+    type: "object",
+    properties: {
+        name: { type: "string", description: "The company name to search for (required if email not provided)" },
+        email: { type: "string", description: "The company email to search for (required if name not provided)" },
+        legalForm: { type: "string", description: "The company legal form code (optional)" },
+        query: { type: "string", description: "A dummy query field to satisfy OpenAI's schema requirements" }
+    },
+    required: ["query"]
 };
 
 // Define Tool type (as it might not be exported)
@@ -51,9 +69,16 @@ const GET_COMPANY_ENREG_INFO_TOOL: Tool = {
     inputSchema: CompanyIdJsonSchema,
 };
 
+const SEARCH_COMPANIES_TOOL: Tool = {
+    name: "search_companies",
+    description: "Searches for companies by name, email or other criteria from enreg.reestri.gov.ge.",
+    inputSchema: SearchCompanyCriteriaJsonSchema,
+};
+
 const ALL_TOOLS = [
     GET_COMPANY_FULL_INFO_TOOL,
     GET_COMPANY_ENREG_INFO_TOOL,
+    SEARCH_COMPANIES_TOOL,
 ] as const;
 
 // --- Helper: fetchAndParseAppDetails --- (Keep the implementation as before)
@@ -330,6 +355,91 @@ async function handleGetCompanyEnregInfo(args: unknown): Promise<CallToolResult>
     }
 }
 
+async function handleSearchCompanies(args: unknown): Promise<CallToolResult> {
+    const validationResult = SearchCompanyCriteriaSchema.safeParse(args);
+    if (!validationResult.success) {
+        return { isError: true, content: [{ type: "text", text: `Invalid input: ${validationResult.error.message}` } as TextContent] };
+    }
+
+    const { name, email, legalForm } = validationResult.data;
+
+    if (!name && !email) {
+        return { isError: true, content: [{ type: "text", text: `At least one search parameter (name or email) must be provided` } as TextContent] };
+    }
+
+    try {
+        console.error(`[MCP ENREG] Searching companies with criteria: ${JSON.stringify({ name, email, legalForm })}`);
+        const ENREG_URL = 'https://enreg.reestri.gov.ge/_dea/main.php';
+        const headers = {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'User-Agent': 'Mozilla/5.0 (compatible; MCPCompanyInfoFetcher/1.0)',
+            'Accept': '*/*',
+            'Origin': 'https://enreg.reestri.gov.ge',
+            'Referer': 'https://enreg.reestri.gov.ge/_dea/main.php?m=new_index'
+        };
+
+        const searchParams = new URLSearchParams();
+        searchParams.append('c', 'search');
+        searchParams.append('m', 'find_legal_persons');
+        searchParams.append('s_legal_person_idnumber', '');
+        searchParams.append('s_legal_person_name', name || '');
+        searchParams.append('s_legal_person_form', legalForm || '0');
+        searchParams.append('s_legal_person_email', email || '');
+
+        const searchResponse = await axios.post(ENREG_URL, searchParams.toString(), { headers: headers, timeout: 15000 });
+        if (searchResponse.status !== 200) throw new Error(`ENREG search failed: ${searchResponse.status}`);
+
+        const $search = load(searchResponse.data);
+        const companies: any[] = [];
+
+        // Parse the search results table
+        $search('table.main_tbl tbody tr').each((i, row) => {
+            const columns = $search(row).find('td');
+            if (columns.length >= 5) {
+                const onclickAttr = $search(columns[0]).find('a').attr('onclick');
+                let legalCodeId: string | null = null;
+
+                if (onclickAttr) {
+                    const match = onclickAttr.match(/show_legal_person\((\d+)\)/);
+                    if (match && match[1]) legalCodeId = match[1];
+                }
+
+                if (legalCodeId) {
+                    companies.push({
+                        enreg_internal_id: legalCodeId,
+                        identification_code: $search(columns[1]).text().trim(),
+                        personal_id: $search(columns[2]).text().trim() || null,
+                        name: $search(columns[3]).text().trim(),
+                        legal_form: $search(columns[4]).text().trim(),
+                        status: $search(columns[5]).find('span').text().trim(),
+                    });
+                }
+            }
+        });
+
+        // Get total count from pagination info
+        let totalCount = "0";
+        const paginationText = $search('div[align="center"] td:contains("სულ")').text();
+        const totalMatch = paginationText.match(/სულ\s+(\d+)/);
+        if (totalMatch && totalMatch[1]) {
+            totalCount = totalMatch[1];
+        }
+
+        const finalResult = {
+            search_criteria: { name, email, legalForm },
+            total_found: parseInt(totalCount, 10),
+            companies: companies
+        };
+
+        return { content: [{ type: "text", text: JSON.stringify(finalResult, null, 2) } as TextContent] };
+    } catch (error: any) {
+        console.error(`[MCP Tool Error - search_companies]:`, error);
+        let errorMessage = `Error searching companies: ${error.message || 'Unknown error'}`;
+        if (axios.isAxiosError(error)) errorMessage += ` (Axios Error: Status ${error.response?.status})`;
+        return { isError: true, content: [{ type: "text", text: errorMessage } as TextContent] };
+    }
+}
+
 // --- MCP Server Setup ---
 
 const server = new Server(
@@ -361,6 +471,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                 return await handleGetCompanyFullInfo(args);
             case GET_COMPANY_ENREG_INFO_TOOL.name:
                 return await handleGetCompanyEnregInfo(args);
+            case SEARCH_COMPANIES_TOOL.name:
+                return await handleSearchCompanies(args);
             default:
                 console.error(`[MCP Server] Unknown tool called: ${toolName}`);
                 return {

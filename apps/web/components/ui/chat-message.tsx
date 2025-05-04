@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/collapsible"
 import { FilePreview } from "@/components/ui/file-preview"
 import { MarkdownRenderer } from "@/components/ui/markdown-renderer"
+import { ExternalLinkWrapper } from "@/components/ui/external-link-wrapper"
 
 const chatBubbleVariants = cva(
   "group/message relative break-words rounded-lg p-3 text-sm sm:max-w-[70%]",
@@ -161,7 +162,9 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
         ) : null}
 
         <div className={cn(chatBubbleVariants({ isUser, animation }))}>
-          <MarkdownRenderer>{content}</MarkdownRenderer>
+          <ExternalLinkWrapper>
+            <MarkdownRenderer>{content}</MarkdownRenderer>
+          </ExternalLinkWrapper>
         </div>
 
         {showTimeStamp && createdAt ? (
@@ -191,7 +194,9 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
             key={`text-${index}`}
           >
             <div className={cn(chatBubbleVariants({ isUser, animation }))}>
-              <MarkdownRenderer>{part.text}</MarkdownRenderer>
+              <ExternalLinkWrapper>
+                <MarkdownRenderer>{part.text}</MarkdownRenderer>
+              </ExternalLinkWrapper>
               {actions ? (
                 <div className="absolute -bottom-4 right-2 flex space-x-1 rounded-lg border bg-background p-1 text-foreground opacity-0 transition-opacity group-hover/message:opacity-100">
                   {actions}
@@ -233,7 +238,9 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
   return (
     <div className={cn("flex flex-col", isUser ? "items-end" : "items-start")}>
       <div className={cn(chatBubbleVariants({ isUser, animation }))}>
-        <MarkdownRenderer>{content}</MarkdownRenderer>
+        <ExternalLinkWrapper>
+          <MarkdownRenderer>{content}</MarkdownRenderer>
+        </ExternalLinkWrapper>
         {actions ? (
           <div className="absolute -bottom-4 right-2 flex space-x-1 rounded-lg border bg-background p-1 text-foreground opacity-0 transition-opacity group-hover/message:opacity-100">
             {actions}

@@ -12,9 +12,9 @@ interface ChatMessage {
 // Simple in-memory storage for conversations
 const conversationHistory = new Map<string, ChatMessage[]>();
 
-// Generate a default session ID if none provided
+// Generate a unique session ID if none provided
 const getSessionId = (req: Request): string => {
-    return req.body.sessionId || 'default-session';
+    return req.body.sessionId || `session-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
 };
 
 const chatHandler: RequestHandler = async (req, res): Promise<void> => {

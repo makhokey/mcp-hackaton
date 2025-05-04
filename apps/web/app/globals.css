@@ -1,8 +1,5 @@
 @import "tailwindcss";
 
-@import "tw-animate-css";
-
-@custom-variant dark (&:is(.dark *));
 
 :root {
   --radius: 0.625rem;
@@ -118,4 +115,43 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
+}
+
+
+
+/* Make all links in markdown content open in new tab */
+.space-y-3 a {
+  target-name: new;
+  target-new: tab;
+}
+
+/* Add specific HTML attributes through CSS content property - older browsers support */
+.space-y-3 a::after {
+  content: attr(target) "_blank";
+  display: none;
+}
+
+  @keyframes typing-dot-bounce {
+    0%,
+    40% {
+      transform: translateY(0);
+    }
+    20% {
+      transform: translateY(-0.25rem);
+    }
+  }
+
+  @layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+    overscroll-behavior: none;
+    -webkit-font-smoothing: antialiased;
+    -webkit-font-size-adjust: 100%;
+    font-size-adjust: 100%;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
 }
